@@ -154,14 +154,26 @@ Evaluator fine print:
 
 ## Harness adapters
 
-EDD Core is a CLI. Any agent or IDE can use it:
+EDD Core is a CLI. **Any agent, harness, or coding IDE can use it.**
+The contract format and decision engine are identical everywhere.
+Only the invocation wrapper differs — and it is always a thin adapter
+with zero business logic.
 
-- **pi**: 40-line TypeScript wrapper calling `edd verify`
-- **DSH**: `tools.bash("edd verify contract.yaml")`
-- **Claude Code / Cursor / Windsurf / Copilot**: terminal command
-- **VSCode**: exec from extension
+| Agent / Harness | How it calls EDD Core |
+|-----------------|----------------------|
+| **DeepSeek Harness (DSH)** | `tools.bash("edd verify contract.yaml")` |
+| **pi** | 40-line TypeScript wrapper calling `edd verify` |
+| **Claude Code** | Terminal: `edd verify contract.yaml` |
+| **GitHub Copilot** | Terminal or extension invoking `edd` CLI |
+| **Cursor** | Terminal: `edd verify contract.yaml` |
+| **Windsurf** | Terminal: `edd verify contract.yaml` |
+| **Gemini CLI** | Terminal: `edd verify contract.yaml` |
+| **VSCode** | Extension exec: `child_process.exec("edd", ["verify", path])` |
+| **Any CI pipeline** | `edd verify contract.yaml --phase premerge` |
 
-No harness contains EDD business logic. The CLI is the single source of truth.
+The CLI is the single source of truth. No harness contains EDD business
+logic. No harness needs to — the contract defines what to verify, the
+binary runs it, and the evidence is JSON that any tool can consume.
 
 ## v1 Migration
 
