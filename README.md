@@ -1,133 +1,156 @@
 # EDD Core
 
-**Define how you will verify code works — before an AI agent writes it.**
+**You describe the goal. The agent writes the evaluation contract. Then
+implements against it. You verify the evidence. Done.**
 
-EDD Core is the minimal, harness-agnostic engine of Evaluation-Driven
-Development. One binary, one contract format, one decision engine.
-No model selection, no ceremony levels, no autonomy budgets.
-The contract defines what "done" means. The CLI verifies it.
-Any agent or IDE can call the CLI.
+EDD flips AI-assisted development: the agent doesn't start coding. It
+starts by defining _how you will know the code is correct_ — a structured
+contract with falsifiable claims and executable evaluators. Then it writes
+code that satisfies them. You review the evidence, not the code.
+
+It works from any input: a user story, a feature request, an epic, a bug
+report, a one-line Slack message. The agent turns intent into a verifiable
+contract. The contract becomes the source of truth for "done."
+
+EDD Core is the minimal engine: one binary, one contract format, one
+decision engine. No model selection, no ceremony, no harness lock-in.
+Any agent, any IDE, any stack.
+
+## The loop
+
+```
+Human: "Add OAuth2 login for the billing API"
+
+Agent:  Creates .edd/contracts/add-oauth2-login.yaml
+        └─ intent: what problem, for whom, what outcome
+        └─ claims: what must be true
+        └─ evaluators: shell commands that check each claim
+
+Agent:  Runs edd verify → evidence bundle (JSON)
+        └─ C1 (token issued): passed
+        └─ C2 (existing tests): passed
+        └─ C3 (no secrets leaked): passed
+        └─ Decision: merge=allow, close=deny (live pending)
+
+Human:  Reviews the evidence. Approves. Merges.
+```
+
+The agent defined how success is measured _before_ writing code. The
+contract is the agreement. The evidence is the proof.
 
 ## Install
 
-### Direct download (Linux, amd64)
-
 ```bash
+# Direct download (Linux, amd64)
 curl -sSL https://github.com/edd-framework/edd-core/releases/download/v0.1.0/edd -o /usr/local/bin/edd
 chmod +x /usr/local/bin/edd
-edd help
-```
 
-### Go install
-
-```bash
+# Go install
 go install github.com/edd-framework/edd-core/cmd/edd@v0.1.0
-```
 
-### Build from source
-
-```bash
+# Build from source
 git clone https://github.com/edd-framework/edd-core.git
-cd edd-core
-go build -o edd ./cmd/edd/
-./edd help
+cd edd-core && go build -o edd ./cmd/edd/
 ```
 
-## Quickstart
+## Commands
 
-```bash
-# 1. Create a contract file (anywhere in your repo)
-cat > .edd/contracts/my-change.yaml << 'EOF'
+| Command | Who runs it | What it does |
+|---------|------------|--------------|
+| `edd validate <contract>` | Agent or human | Structural check. Errors are blocking. |
+| `edd verify <contract> [--phase live]` | Agent | Runs evaluators, outputs evidence JSON. |
+| `edd decide <evidence.json>` | CI or human | Computes merge/close/status from evidence. |
+| `edd help` | Anyone | Shows usage. |
+
+## The contract
+
+A YAML file the agent creates from your intent. See
+[CONTRACT.md](CONTRACT.md) for the full reference.
+
+```yaml
 schema: edd/contract/v2
-contract_id: "MY-CHANGE"
+contract_id: "ADD-OAUTH2-LOGIN"
 profile: standard
 
 intent:
-  actor: "developers deploying the service"
-  problem: "No health check; 2 incidents of dead backends receiving traffic"
+  actor: "billing API consumers"
+  problem: "No auth on billing endpoints; PII exposed"
   outcome:
-    observable: "GET /health returns 200"
-    baseline: "no endpoint exists"
-    threshold: "p95 < 100ms"
-    instrument: "prometheus:http_request_duration_seconds"
-    sample: "all /health requests"
-    window: "7 days"
+    observable: "POST /auth/token returns JWT; billing endpoints require it"
+    baseline: "0 endpoints secured"
+    threshold: "auth covers all /api/billing/* routes"
+    instrument: "curl + integration test suite"
+    sample: "all billing endpoints"
+    window: "pre-merge"
 
 hypothesis:
-  statement: "Health endpoint will let LB detect dead instances in < 10s"
-  falsified_when: "Any incident of traffic to dead backend > 10s"
+  statement: "Adding OAuth2 will secure billing endpoints without breaking existing integrations"
+  based_on: "security audit Q3-001"
+  falsified_when: "Any billing endpoint accepts requests without a valid token"
 
 claims:
   - id: C1
     type: functional
     phase: premerge
     blocking: true
-    statement: "GET /health returns 200 with status ok"
+    statement: "POST /auth/token returns a signed JWT for valid credentials"
     evaluators:
       - id: E1
         type: fail_to_pass
-        run: "curl -s http://localhost:8080/health"
-EOF
+        run: "pytest tests/test_auth.py::test_token_issued -q"
+        expect: "exit 0"
 
-# 2. Validate the contract structure
-edd validate .edd/contracts/my-change.yaml
+  - id: C2
+    type: regression
+    phase: premerge
+    blocking: true
+    statement: "Existing billing integration tests still pass"
+    evaluators:
+      - id: E2
+        type: pass_to_pass
+        run: "pytest tests/test_billing.py -q"
+        expect: "exit 0"
 
-# 3. Run evaluators, produce evidence JSON
-edd verify .edd/contracts/my-change.yaml
+  - id: C3
+    type: safety
+    phase: premerge
+    blocking: true
+    statement: "No secrets or credentials in source or logs"
+    evaluators:
+      - id: E3
+        type: structural
+        run: "grep -rE 'TODO-remove|temp-token|sk-.*test' src/ && exit 1 || exit 0"
+        expect: "exit 0"
 
-# 4. Inspect the evidence
-edd decide .edd/contracts/my-change.yaml
+gates:
+  - id: HG-RELEASE
+    type: release
+    mandatory: true
+    reason: "Auth changes require security review"
 ```
-
-## How it works
-
-1. **Contract** — a YAML file with claims (falsifiable statements) and
-   evaluators (shell commands that check them)
-2. **Verify** — run the evaluators, produce a JSON evidence bundle
-3. **Decide** — the engine computes merge/close/status deterministically
-   from evidence, never from prose or vibes
-
-## Commands
-
-| Command | What it does |
-|---------|-------------|
-| `edd validate <file>` | Check contract structure. Errors are blocking. |
-| `edd verify <file> [--phase live]` | Run evaluators, output evidence JSON. |
-| `edd decide <evidence.json>` | Compute merge/close/status from a bundle. |
-| `edd help` | Show usage. |
 
 ## Decision engine
 
-The engine is deterministic and never collapses to a single ambiguous PASS:
+Deterministic. Never a single ambiguous PASS.
 
-| Decision | When |
+| Decision | Rule |
 |----------|------|
-| merge=allow | All blocking premerge claims pass + all mandatory gates approved |
-| merge=deny | Any blocking claim fails or a mandatory gate is pending |
-| close=allow | Merge is allow + all blocking live claims pass |
-| close=deny | Merge is deny or a blocking live claim is pending |
+| merge=allow | Every blocking premerge claim: all its evaluators selected, executed, and passed. No mandatory gate pending. |
+| merge=deny | Any blocking claim fails, or a mandatory gate is unapproved. |
+| close=allow | merge=allow + every blocking live claim also satisfied. |
+| close=deny | Otherwise. A pending live claim blocks close even if premerge is green. |
 
 | Status | Meaning |
 |--------|---------|
 | failed | A blocking premerge claim did not pass |
-| ready | Claims pass but a mandatory gate is pending approval |
-| verified_premerge | Premerge done, no live claims (or live pending) |
-| validated_live | Live claims pass, ready to close |
+| ready | Claims pass, a mandatory gate awaits approval |
+| verified_premerge | Premerge done, live not yet checked |
+| validated_live | Live claims pass |
 | closed | Close confirmed |
 
-A pending live claim keeps `close=deny` even when every premerge claim is
-green. There is no single ambiguous PASS.
-
-Evaluator semantics:
-- `skipped`, `xfail`, `executed=false` → claim NOT satisfied
-- Evaluator absent from evidence → claim NOT satisfied
-- All evaluators must be `selected + executed + result=passed` for a blocking claim
-
-## Contract format
-
-See [CONTRACT.md](CONTRACT.md) for the complete reference. One file per change.
-Required fields: `schema`, `contract_id`, `profile`, `intent`, `hypothesis`, `claims`.
-Each claim requires `id`, `type`, `phase`, `statement`, and at least one `evaluator`.
+Evaluator fine print:
+- `skipped`, `xfail`, `executed=false`, or absent from evidence → claim NOT satisfied
+- A blocking claim needs _all_ its evaluators selected+executed+passed
 
 ## Harness adapters
 
@@ -142,10 +165,9 @@ No harness contains EDD business logic. The CLI is the single source of truth.
 
 ## v1 Migration
 
-If you have v1 eval specs in `evals/`, see [docs/migration-v1-to-v2.md](docs/migration-v1-to-v2.md).
-v1 specs are recognized as legacy. Migrate at your own pace — no flag day.
+Have v1 eval specs in `evals/`? See [docs/migration-v1-to-v2.md](docs/migration-v1-to-v2.md).
+Migrate at your own pace. No flag day.
 
 ## License
 
-Business Source License 1.1 — permits internal use, consulting, education,
-and research. Converts to Apache 2.0 on 2030-03-02.
+Business Source License 1.1 → Apache 2.0 on 2030-03-02.
