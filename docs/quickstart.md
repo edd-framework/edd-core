@@ -45,3 +45,4 @@ $ edd status .edd/contracts/add-health-check-endpoint.yaml
 ```
 
 Shows claims, gates, and the computed merge/close decision.
+
