@@ -16,48 +16,65 @@ EDD Core is the minimal engine: one binary, one contract format, one
 decision engine. No model selection, no ceremony, no harness lock-in.
 Any agent, any IDE, any stack.
 
-## How it works
+## What edd does
 
-EDD uses **inverse valuation**: the human states the goal in their own
-words, and the agent proposes how success will be measured. The human
-reacts to the proposal — accept, reject, or refine — instead of having
-to invent metrics from scratch. `edd validate` ensures every proposal
-is concrete before work begins.
+**You say what you want. The agent proposes how to verify it. edd ensures
+the proposal is concrete — before any code is written.**
 
-### The loop
+edd turns human intent into precise instructions for the agent and
+defines measurable indicators to evaluate the result afterward.
+
+The human does not need to invent metrics, thresholds, or test commands.
+The agent proposes them. The human reacts to the proposal — accept,
+correct, or reject. `edd validate` forces every field to be filled with
+something concrete. `edd verify` produces evidence that it was done.
+
+### The cycle
 
 ```
 Human: "Improve the onboarding flow"
+        └─ Intent expressed. Vague. No metrics. No tests.
 
 Agent:  Creates .edd/contracts/improve-onboarding.yaml
-        └─ Proposes: "completion rate" as the metric
-        └─ Proposes: PostHog as the instrument
-        └─ Proposes: "60% within 14 days" as the threshold
-        └─ Proposes: "making step 3 optional" as the intervention
+        └─ Proposes: completion rate as the metric
+        └─ Proposes: 60% threshold within 14 days
+        └─ Proposes: making step 3 optional as the intervention
+        └─ Proposes: PostHog as the measurement instrument
+        └─ Proposes: pytest tests/test_onboarding.py as the evaluator
         └─ Runs edd validate → VALID
 
-Human:  "60% is too aggressive. And we use Mixpanel, not PostHog."
+        The agent turned "improve onboarding" into precise,
+        verifiable instructions. Before writing a single line of code.
 
-Agent:  Adjusts threshold to 45%, instrument to Mixpanel.
+Human:  "60% is too aggressive. We use Mixpanel, not PostHog."
+        └─ Reacts to the proposal. Corrects two things.
+
+Agent:  Adjusts threshold to 45%. Switches instrument to Mixpanel.
         └─ Runs edd validate → VALID
 
 Human:  "Approved. Build it."
+        └─ Contract is now a shared agreement on what "done" means.
 
-Agent:  Implements → runs edd verify → evidence bundle (JSON)
-        └─ C1 (skip button works): passed
-        └─ C2 (existing steps intact): passed
-        └─ C3 (live metric pending): pending
+Agent:  Implements the skip button. Runs edd verify.
+        └─ C1 (skip button works):      passed
+        └─ C2 (existing onboarding ok): passed
+        └─ C3 (live metric):            pending (needs production data)
         └─ Decision: merge=allow, close=deny
 
-Human:  Reviews the evidence. Merges. Deploys.
-        └─ 14 days later: edd verify --phase live → C3 passed
+Human:  Reviews the evidence — not the code. Merges. Deploys.
+
+14 days later:
+
+Agent:  Runs edd verify --phase live
+        └─ C3 (completion rate >= 45%): passed
         └─ Decision: close=allow
+
+        The contract opened with intent. It closed with evidence.
 ```
 
-The agent proposed the metric, the instrument, the threshold, the
-intervention, and the falsifiable condition. The human only had to
-correct two things. That is inverse valuation: the contract does the
-heavy lifting of turning intent into a verifiable plan.
+Before edd, the cycle was: "Write code. Review code. Hope it works."
+With edd, the cycle is: "Define success. Propose how to measure it.
+Agree on the contract. Execute. Verify with evidence. Close."
 
 ## Install
 
