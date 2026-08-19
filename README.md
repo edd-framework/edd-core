@@ -4,61 +4,40 @@
 
 EDD Core is the minimal, harness-agnostic engine of Evaluation-Driven
 Development. One binary, one contract format, one decision engine.
+No model selection, no ceremony levels, no autonomy budgets.
+The contract defines what "done" means. The CLI verifies it.
+Any agent or IDE can call the CLI.
 
 ## Install
 
-### Homebrew (macOS/Linux)
+### Direct download (Linux, amd64)
 
 ```bash
-brew install edd-framework/tap/edd
+curl -sSL https://github.com/edd-framework/edd-core/releases/download/v0.1.0/edd -o /usr/local/bin/edd
+chmod +x /usr/local/bin/edd
+edd help
 ```
 
 ### Go install
 
 ```bash
-go install github.com/edd-framework/edd-core/cmd/edd@latest
+go install github.com/edd-framework/edd-core/cmd/edd@v0.1.0
 ```
 
-### Direct download
+### Build from source
 
 ```bash
-curl -sSL https://edd-framework.github.io/edd-core/install.sh | bash
+git clone https://github.com/edd-framework/edd-core.git
+cd edd-core
+go build -o edd ./cmd/edd/
+./edd help
 ```
 
-## Quickstart (3 minutes)
+## Quickstart
 
 ```bash
-# Initialize EDD in your repo
-edd init
-
-# Create a contract for your change
-edd new "Add health check endpoint" --profile standard
-
-# Edit .edd/contracts/add-health-check-endpoint.yaml
-# Fill in intent, claims, and evaluators
-
-# Run evaluators and produce evidence
-edd verify .edd/contracts/add-health-check-endpoint.yaml
-
-# See claims, gates, and the computed decision
-edd status .edd/contracts/add-health-check-endpoint.yaml
-```
-
-## How it works
-
-1. **Contract** — a YAML file that defines "done correctly": claims
-   (falsifiable statements) and evaluators (shell commands that check them)
-2. **Verify** — run the evaluators, produce a JSON evidence bundle
-3. **Decide** — the engine computes merge/close/status deterministically
-   from evidence, never from prose or vibes
-
-## Contract format
-
-See [CONTRACT.md](CONTRACT.md) for the complete reference.
-
-A minimal contract:
-
-```yaml
+# 1. Create a contract file (anywhere in your repo)
+cat > .edd/contracts/my-change.yaml << 'EOF'
 schema: edd/contract/v2
 contract_id: "MY-CHANGE"
 profile: standard
@@ -87,12 +66,72 @@ claims:
     evaluators:
       - id: E1
         type: fail_to_pass
-        run: "curl -s http://localhost:8080/health | grep -q ok"
+        run: "curl -s http://localhost:8080/health"
+EOF
+
+# 2. Validate the contract structure
+edd validate .edd/contracts/my-change.yaml
+
+# 3. Run evaluators, produce evidence JSON
+edd verify .edd/contracts/my-change.yaml
+
+# 4. Inspect the evidence
+edd decide .edd/contracts/my-change.yaml
 ```
+
+## How it works
+
+1. **Contract** — a YAML file with claims (falsifiable statements) and
+   evaluators (shell commands that check them)
+2. **Verify** — run the evaluators, produce a JSON evidence bundle
+3. **Decide** — the engine computes merge/close/status deterministically
+   from evidence, never from prose or vibes
+
+## Commands
+
+| Command | What it does |
+|---------|-------------|
+| `edd validate <file>` | Check contract structure. Errors are blocking. |
+| `edd verify <file> [--phase live]` | Run evaluators, output evidence JSON. |
+| `edd decide <evidence.json>` | Compute merge/close/status from a bundle. |
+| `edd help` | Show usage. |
+
+## Decision engine
+
+The engine is deterministic and never collapses to a single ambiguous PASS:
+
+| Decision | When |
+|----------|------|
+| merge=allow | All blocking premerge claims pass + all mandatory gates approved |
+| merge=deny | Any blocking claim fails or a mandatory gate is pending |
+| close=allow | Merge is allow + all blocking live claims pass |
+| close=deny | Merge is deny or a blocking live claim is pending |
+
+| Status | Meaning |
+|--------|---------|
+| failed | A blocking premerge claim did not pass |
+| ready | Claims pass but a mandatory gate is pending approval |
+| verified_premerge | Premerge done, no live claims (or live pending) |
+| validated_live | Live claims pass, ready to close |
+| closed | Close confirmed |
+
+A pending live claim keeps `close=deny` even when every premerge claim is
+green. There is no single ambiguous PASS.
+
+Evaluator semantics:
+- `skipped`, `xfail`, `executed=false` → claim NOT satisfied
+- Evaluator absent from evidence → claim NOT satisfied
+- All evaluators must be `selected + executed + result=passed` for a blocking claim
+
+## Contract format
+
+See [CONTRACT.md](CONTRACT.md) for the complete reference. One file per change.
+Required fields: `schema`, `contract_id`, `profile`, `intent`, `hypothesis`, `claims`.
+Each claim requires `id`, `type`, `phase`, `statement`, and at least one `evaluator`.
 
 ## Harness adapters
 
-EDD Core is a CLI tool. Any agent or IDE can use it:
+EDD Core is a CLI. Any agent or IDE can use it:
 
 - **pi**: 40-line TypeScript wrapper calling `edd verify`
 - **DSH**: `tools.bash("edd verify contract.yaml")`
@@ -101,44 +140,12 @@ EDD Core is a CLI tool. Any agent or IDE can use it:
 
 No harness contains EDD business logic. The CLI is the single source of truth.
 
-## Decision engine
+## v1 Migration
 
-The engine is deterministic and never collapses to a single ambiguous PASS:
-
-| Merge | When |
-|-------|------|
-| allow | All blocking premerge claims pass + all mandatory gates approved |
-| deny  | Any blocking premerge claim fails or a mandatory gate is pending |
-
-| Close | When |
-|-------|------|
-| allow | Merge is allow + all blocking live claims pass |
-| deny  | Merge is deny or a blocking live claim is pending |
-
-| Status | Meaning |
-|--------|---------|
-| failed | A blocking premerge claim did not pass |
-| ready | Premerge claims pass but a gate is pending approval |
-| verified_premerge | Premerge done, live not yet checked |
-| validated_live | Live claims pass — ready to close |
-| closed | Close confirmed |
-
-A pending live claim keeps close=deny even when every premerge claim is
-green. There is no single ambiguous PASS.
-
-## Differences from v1
-
-EDD v1 used two files per change (objective spec + eval spec) with ~40
-YAML fields, many specific to the toolkit's internal framework. EDD Core
-uses one contract file with ~15 fields, all focused on the evaluation
-itself. Everything else (autonomy level, budget, model selection, ceremony)
-is a harness/operator concern, not a contract concern.
-
-v1 specs in `evals/` are still recognized by `edd check` and reported
-as "legacy — consider migrating." Use `edd migrate` for best-effort
-conversion.
+If you have v1 eval specs in `evals/`, see [docs/migration-v1-to-v2.md](docs/migration-v1-to-v2.md).
+v1 specs are recognized as legacy. Migrate at your own pace — no flag day.
 
 ## License
 
-Business Source License 1.1 — permits internal use, consulting,
-education, and research. Converts to Apache 2.0 on 2030-03-02.
+Business Source License 1.1 — permits internal use, consulting, education,
+and research. Converts to Apache 2.0 on 2030-03-02.
