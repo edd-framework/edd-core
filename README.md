@@ -16,27 +16,48 @@ EDD Core is the minimal engine: one binary, one contract format, one
 decision engine. No model selection, no ceremony, no harness lock-in.
 Any agent, any IDE, any stack.
 
-## The loop
+## How it works
+
+EDD uses **inverse valuation**: the human states the goal in their own
+words, and the agent proposes how success will be measured. The human
+reacts to the proposal — accept, reject, or refine — instead of having
+to invent metrics from scratch. `edd validate` ensures every proposal
+is concrete before work begins.
+
+### The loop
 
 ```
-Human: "Add OAuth2 login for the billing API"
+Human: "Improve the onboarding flow"
 
-Agent:  Creates .edd/contracts/add-oauth2-login.yaml
-        └─ intent: what problem, for whom, what outcome
-        └─ claims: what must be true
-        └─ evaluators: shell commands that check each claim
+Agent:  Creates .edd/contracts/improve-onboarding.yaml
+        └─ Proposes: "completion rate" as the metric
+        └─ Proposes: PostHog as the instrument
+        └─ Proposes: "60% within 14 days" as the threshold
+        └─ Proposes: "making step 3 optional" as the intervention
+        └─ Runs edd validate → VALID
 
-Agent:  Runs edd verify → evidence bundle (JSON)
-        └─ C1 (token issued): passed
-        └─ C2 (existing tests): passed
-        └─ C3 (no secrets leaked): passed
-        └─ Decision: merge=allow, close=deny (live pending)
+Human:  "60% is too aggressive. And we use Mixpanel, not PostHog."
 
-Human:  Reviews the evidence. Approves. Merges.
+Agent:  Adjusts threshold to 45%, instrument to Mixpanel.
+        └─ Runs edd validate → VALID
+
+Human:  "Approved. Build it."
+
+Agent:  Implements → runs edd verify → evidence bundle (JSON)
+        └─ C1 (skip button works): passed
+        └─ C2 (existing steps intact): passed
+        └─ C3 (live metric pending): pending
+        └─ Decision: merge=allow, close=deny
+
+Human:  Reviews the evidence. Merges. Deploys.
+        └─ 14 days later: edd verify --phase live → C3 passed
+        └─ Decision: close=allow
 ```
 
-The agent defined how success is measured _before_ writing code. The
-contract is the agreement. The evidence is the proof.
+The agent proposed the metric, the instrument, the threshold, the
+intervention, and the falsifiable condition. The human only had to
+correct two things. That is inverse valuation: the contract does the
+heavy lifting of turning intent into a verifiable plan.
 
 ## Install
 
