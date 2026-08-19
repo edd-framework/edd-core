@@ -243,3 +243,39 @@ chmod +x /usr/local/bin/edd
 If `edd` is not available, validate the contract yourself against the
 schema and run evaluators manually. The contract format is the value —
 the binary is the reference implementation.
+
+## Proven patterns
+
+These rules emerged from real use across 4 production repos and 740+ eval
+specs. They are not theoretical — each one prevented a real failure.
+
+### 1. Every quantitative claim needs a re-executable command
+
+Never cite a file:line as evidence. Always provide a command that anyone
+can run to reproduce the result. (Source: LEARNINGS #79 — fabricated evidence
+passed two human gates.)
+
+### 2. Measure the baseline before writing the contract
+
+Run a measurement command before filling in intent.outcome.baseline.
+If impossible, declare: "no baseline — will measure in Phase 0".
+(Source: LEARNINGS #82 — stale baseline caused rework.)
+
+### 3. One test per claim, traceable and reproducible
+
+Each functional claim names a specific test. Never use "make test" as
+a catch-all evaluator. (Source: PAT-004 — 1116 tests mapping to claims.)
+
+### 4. Destructive actions require a mandatory human gate
+
+If the change could delete or recreate production resources, add a gate
+of type destructive_action with mandatory: true. (Source: AWS/Kiro incident.)
+
+### 5. Start advisory, progress to enforced
+
+After 5 successful cycles, move from advisory to enforced.
+(Source: ADR-004 — teams starting enforced often abandon the practice.)
+
+## Full pattern catalog
+
+See [docs/patterns/INDEX.md](docs/patterns/INDEX.md) for the complete list.
