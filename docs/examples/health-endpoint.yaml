@@ -1,0 +1,74 @@
+schema: edd/contract/v2
+contract_id: ADD-HEALTH-ENDPOINT
+profile: express
+status: draft
+intent:
+  actor: platform engineers operating the load balancer
+  problem: No health check endpoint means the LB cannot detect unhealthy instances;
+    2 incidents in Q3
+  outcome:
+    observable: GET /health returns 200 with JSON status field
+    baseline: no health endpoint exists
+    threshold: GET /health responds within 100ms p95 under normal load
+    instrument: prometheus:http_request_duration_seconds
+    sample: all /health requests during 7-day observation
+    window: 7 days post-deploy
+  constraints:
+  - must not expose version info or internal state
+  - must not require authentication
+hypothesis:
+  statement: A /health endpoint will let the LB detect and drain unhealthy instances
+    within 10s of failure
+  based_on: incident RCA Q3-002
+  falsified_when: Any incident where LB routes traffic to a dead backend for more
+    than 10s after adding the endpoint
+claims:
+- id: C1
+  type: functional
+  phase: premerge
+  blocking: true
+  statement: GET /health returns 200 with JSON status ok
+  evaluators:
+  - id: E1
+    type: fail_to_pass
+    run: 'true'
+    expect: exit 0
+- id: C2
+  type: regression
+  phase: premerge
+  blocking: true
+  statement: Existing API endpoints still return expected responses
+  evaluators:
+  - id: E2
+    type: pass_to_pass
+    run: 'true'
+    expect: exit 0
+- id: C3
+  type: safety
+  phase: premerge
+  blocking: true
+  statement: Health endpoint does not leak version, config, or environment info
+  evaluators:
+  - id: E3
+    type: structural
+    run: 'true'
+    expect: exit 0
+- id: C4
+  type: product
+  phase: live
+  blocking: true
+  statement: p95 latency of /health stays under 100ms in production
+  evaluators:
+  - id: E4
+    type: measurement
+    run: 'true'
+    expect: exit 0
+gates:
+- id: HG-RELEASE
+  type: release
+  mandatory: true
+  reason: New public endpoint requires review
+technical_approval:
+  approver: '@tech-lead'
+  state: pending
+  approved_section_sha: ''
