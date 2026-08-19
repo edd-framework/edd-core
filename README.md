@@ -1,33 +1,53 @@
 # EDD Core
 
-**You describe the goal. The agent writes the evaluation contract. Then
-implements against it. You verify the evidence. Done.**
+**EDD Core specifies, once, how success is measured — before any code
+is written. The agent generates the goal and its implementation. The
+agent evaluates the result against the indicators. EDD Core provides
+the one thing the agent does not: an objective, verifiable definition
+of "done."**
 
-EDD flips AI-assisted development: the agent doesn't start coding. It
-starts by defining _how you will know the code is correct_ — a structured
-contract with falsifiable claims and executable evaluators. Then it writes
-code that satisfies them. You review the evidence, not the code.
+EDD Core is a single, harness-agnostic focus: the **evaluation spec** —
+a structured contract that defines, with objective and verifiable
+indicators, when the goal has been achieved. Nothing else.
 
-It works from any input: a user story, a feature request, an epic, a bug
-report, a one-line Slack message. The agent turns intent into a verifiable
-contract. The contract becomes the source of truth for "done."
+What EDD Core is **not**:
 
-EDD Core is the minimal engine: one binary, one contract format, one
-decision engine. No model selection, no ceremony, no harness lock-in.
-Any agent, any IDE, any stack.
+- It does not generate the goal. The agent does — from a user story,
+  a feature request, an epic, a bug report, a one-line message.
+- It does not translate intent into the spec. The agent does that,
+  guided by the contract format.
+- It does not write the code. The agent's harness already does that well.
+- It does not evaluate the result. The agent runs the evaluators and
+  reports the evidence.
 
-## What edd does
+EDD Core provides the format, the validation, and the deterministic
+decision. It is the objective mirror the agent holds its work up to.
 
-**You say what you want. The agent proposes how to verify it. edd ensures
-the proposal is concrete — before any code is written.**
+## What EDD Core does — and does not do
 
-edd turns human intent into precise instructions for the agent and
-defines measurable indicators to evaluate the result afterward.
+EDD Core's focus is narrow and single: the **evaluation spec**. That is
+the artifact that makes "done" objective and verifiable, by defining
+indicators for the goal before implementation.
+
+| Concern | Who owns it |
+|---------|-------------|
+| Generating the goal (from a story, epic, bug, message) | The agent, guided by the human |
+| Translating that goal into the evaluation spec | The agent |
+| Implementing the code | The agent (its harness already does this well) |
+| Evaluating the result against the indicators | The agent, running the declared evaluators |
+| **The evaluation spec format** — the contract structure | **EDD Core** |
+| **Validating the spec is complete and concrete** | **EDD Core** (`edd validate`) |
+| **The deterministic "done" decision from evidence** | **EDD Core** (`edd decide`) |
+
+EDD Core does not compete with the agent or its harness. It fills the one
+gap: a permanent, objective definition of success that survives the
+conversation and can be checked mechanically.
 
 The human does not need to invent metrics, thresholds, or test commands.
-The agent proposes them. The human reacts to the proposal — accept,
-correct, or reject. `edd validate` forces every field to be filled with
-something concrete. `edd verify` produces evidence that it was done.
+The agent proposes them, guided by the spec format. The human reacts to
+the proposal — accept, correct, or reject. `edd validate` makes sure
+nothing is left vague. The agent then implements and evaluates, and
+`edd decide` converts the evidence into an unambiguous decision.
 
 ### The cycle
 
@@ -72,9 +92,11 @@ Agent:  Runs edd verify --phase live
         The contract opened with intent. It closed with evidence.
 ```
 
-Before edd, the cycle was: "Write code. Review code. Hope it works."
-With edd, the cycle is: "Define success. Propose how to measure it.
-Agree on the contract. Execute. Verify with evidence. Close."
+Before the evaluation spec existed, the cycle was: "Write code. Review
+code. Hope it works." With it, the cycle is: the agent generates the goal,
+translates it into a verifiable spec, the human agrees, the agent
+implements and evaluates against the indicators, and the decision is
+computed from evidence — not from hope.
 
 ## Install
 
@@ -102,8 +124,9 @@ cd edd-core && go build -o edd ./cmd/edd/
 
 ## The contract
 
-A YAML file the agent creates from your intent. See
-[CONTRACT.md](CONTRACT.md) for the full reference.
+A YAML file that the agent writes, guided by this format, to define the
+objective and its verifiable indicators. See [CONTRACT.md](CONTRACT.md)
+for the full reference.
 
 ```yaml
 schema: edd/contract/v2
