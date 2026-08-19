@@ -171,9 +171,11 @@ with zero business logic.
 | **VSCode** | Extension exec: `child_process.exec("edd", ["verify", path])` |
 | **Any CI pipeline** | `edd verify contract.yaml --phase premerge` |
 
-The CLI is the single source of truth. No harness contains EDD business
-logic. No harness needs to — the contract defines what to verify, the
-binary runs it, and the evidence is JSON that any tool can consume.
+The contract defines what to verify. The binary runs it. The evidence
+is JSON that any tool can consume. The harness brings its own strengths —
+conversation, tool integration, code generation — and EDD Core adds the
+evaluation loop: define success before coding, verify with evidence,
+decide deterministically.
 
 ## v1 Migration
 
