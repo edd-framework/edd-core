@@ -41,7 +41,7 @@ indicators for the goal before implementation.
 
 EDD Core does not compete with the agent or its harness. It fills the one
 gap: a permanent, objective definition of success that survives the
-conversation and can be checked mechanically.
+conversation and can be checked objectively, by anyone, at any time.
 
 The human does not need to invent metrics, thresholds, or test commands.
 The agent proposes them, guided by the spec format. The human reacts to
